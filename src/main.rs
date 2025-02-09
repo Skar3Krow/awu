@@ -100,7 +100,7 @@ fn print_long_format(entry: &DirEntry) -> Result<()> {
     let file_type = if file_metadata.is_dir() { "d" } else { "f" };
     let file_size = file_metadata.len();
     println!(
-        "{:<3} {:<5} {:?}",
+        "{:<3} {:<5} {}",
         file_type.red(),
         file_size,
         entry.file_name().to_string_lossy().green()
