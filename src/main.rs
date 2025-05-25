@@ -82,7 +82,7 @@ fn list_function(directory: &str, display_all: bool, long_format: bool) -> Resul
                         Err(e) => println!("Error Occured: {:?}", e),
                     };
                 } else {
-                    println!("{:?}", entry.file_name().to_string_lossy());
+                    println!("{}", entry.file_name().to_string_lossy());
                 }
             }
         }
