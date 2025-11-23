@@ -6,8 +6,11 @@ use args::{CliTool, EntityType};
 use clap::Parser;
 use colored::*;
 use regex::Regex;
-use std::fs::{self, DirEntry, File};
+use std::fs::{self, create_dir, DirEntry, File};
 use std::io::{self, BufRead, Read, Result};
+use std::path::Path;
+use std::sync::mpsc;
+use threadpool::{self, ThreadPool};
 use walkdir::WalkDir;
 
 fn main() {
@@ -45,13 +48,7 @@ fn main() {
         }
         EntityType::Create(create_argument) => {
             match create_function(create_argument.directory, create_argument.file_name) {
-                Ok(created_file_name) => {
-                    println!(
-                        "{} \nFile Name: {}",
-                        "File Created".green(),
-                        created_file_name.red()
-                    );
-                }
+                Ok(()) => (),
                 Err(e) => eprintln!("Error: {:?}", e),
             }
         }
@@ -149,25 +146,55 @@ fn find_file_function(dir_name: &String, file_name: &str) -> Result<()> {
     Ok(())
 }
 
-fn grep_function(pattern: &str, filename: &str) -> Result<()> {
+fn grep_function(pattern: &str, files: &Option<Vec<String>>) -> Result<()> {
+    let pool = ThreadPool::new(4);
+    let (tx, rx) = mpsc::channel::<String>();
     let re = Regex::new(pattern).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
-    let file = File::open(filename)?;
-    let reader = io::BufReader::new(file);
-    for (index, line) in reader.lines().enumerate() {
-        let line = line?;
-        if re.is_match(&line) {
-            println!("Line - {}: {}", index + 1, line);
+    match files {
+        Some(file_vector) => {
+            for file in file_vector {
+                let tx = tx.clone();
+                let re = re.clone();
+                let file = file.clone();
+                pool.execute(move || {
+                    let f = match File::open(&file) {
+                        Ok(f) => f,
+                        Err(_) => {
+                            eprintln!("File could not be opened...");
+                            return;
+                        }
+                    };
+                    let reader = io::BufReader::new(f);
+                    for (index, line) in reader.lines().enumerate() {
+                        let line = match line {
+                            Ok(l) => l,
+                            Err(_) => continue,
+                        };
+                        if re.is_match(&line) {
+                            tx.send(format!("Line - {}: {}", index + 1, line)).unwrap();
+                        }
+                    }
+                });
+            }
+            drop(tx);
+            for msg in rx {
+                println!("{}", msg);
+            }
         }
+        None => println!("Error: Files not provided/found"),
     }
 
     Ok(())
 }
 
-fn create_function(is_directory: bool, file_name: String) -> Result<String> {
+fn create_function(is_directory: bool, file_name: String) -> Result<()> {
     if is_directory {
-        println!("{}", "I dunno, create a directory".red());
+        let dir_path = Path::new(&file_name);
+        create_dir(dir_path)?;
+        println!("Directory : {} has been created", &file_name.green());
     } else {
         File::create_new(&file_name)?;
+        println!("File {} has been created", file_name.green());
     }
-    Ok(file_name)
+    Ok(())
 }

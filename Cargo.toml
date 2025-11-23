@@ -12,4 +12,5 @@ description = "This is a Command Line Interface Tool which can be used to run si
 clap = { version = "4.5.17", features = ["derive", "cargo"] }
 colored = "2.1.0"
 regex = "1.10.6"
+threadpool = "1.8.1"
 walkdir = "2.5.0"

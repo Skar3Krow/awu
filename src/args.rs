@@ -66,7 +66,7 @@ pub struct GrepArgs {
     /// Text to be matched
     pub match_text: String,
     /// File in which you want to match text
-    pub file_name: String,
+    pub file_name: Option<Vec<String>>,
 }
 
 #[derive(Debug, Args)]
