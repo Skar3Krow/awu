@@ -2,8 +2,7 @@
 mod args;
 
 //Function Imports
-use args::{CliTool, EntityType};
-use clap::Parser;
+use crate::args::{parse_command, Command};
 use colored::*;
 use regex::Regex;
 use std::fs::{self, create_dir, DirEntry, File};
@@ -14,6 +13,56 @@ use threadpool::{self, ThreadPool};
 use walkdir::WalkDir;
 
 fn main() {
+    loop {
+        print!("awu> ");
+        std::io::Write::flush(&mut std::io::stdout()).unwrap();
+
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).unwrap();
+
+        let command = parse_command(&input.trim());
+        match command {
+            Command::Echo(some_string) => match echo_function(&some_string.repeated_vector) {
+                Ok(_) => (),
+                Err(e) => eprintln!("Error: {}", e),
+            },
+            Command::List(list_args) => {
+                match list_function(&list_args.directory, list_args.all, list_args.long) {
+                    Ok(_) => (),
+                    Err(e) => eprintln!("Error: {}", e),
+                }
+            }
+            Command::Cat(cat_args) => match concatenate_function(cat_args.dir, &cat_args.files) {
+                Ok(_) => (),
+                Err(e) => eprintln!("Error: {}", e),
+            },
+            Command::Find(find_args) => {
+                match find_file_function(&find_args.dir_name, &find_args.file_name) {
+                    Ok(_) => (),
+                    Err(e) => eprintln!("Error: {}", e),
+                }
+            }
+            Command::Grep(grep_args) => {
+                match grep_function(&grep_args.match_text, &grep_args.file_name) {
+                    Ok(_) => (),
+                    Err(e) => eprintln!("Error: {}", e),
+                }
+            }
+            Command::Create(create_args) => {
+                match create_function(create_args.directory, create_args.file_name) {
+                    Ok(_) => (),
+                    Err(e) => eprintln!("Error: {}", e),
+                }
+            }
+            Command::Exit() => {
+                break;
+            }
+            Command::Unknown(some_string) => {
+                println!("Function {} is not yet written dumbass...", some_string)
+            }
+        }
+    }
+    /*
     let matches = CliTool::parse();
     match matches.entity_type {
         EntityType::Echo(some_string) => match echo_function(&some_string.repeated_vector) {
@@ -53,15 +102,11 @@ fn main() {
             }
         }
     };
+    */
 }
 
-fn echo_function(some_vector: &Option<Vec<String>>) -> Result<()> {
-    match some_vector {
-        Some(vector) => {
-            println!("{}", vector.join(" ").green())
-        }
-        None => println!("Nothing goin on here"),
-    }
+fn echo_function(some_vector: &Vec<String>) -> Result<()> {
+    println!("{}", some_vector.join(" ").green());
     Ok(())
 }
 
@@ -105,33 +150,29 @@ fn print_long_format(entry: &DirEntry) -> Result<()> {
     Ok(())
 }
 
-fn concatenate_function(is_directory: bool, files: &Option<Vec<String>>) -> Result<()> {
+fn concatenate_function(is_directory: bool, files: &Vec<String>) -> Result<()> {
     let mut contents = String::new();
-    match files {
-        Some(some_file) => {
-            if is_directory {
-                let some_file_clone = some_file.clone();
-                let paths = fs::read_dir(&some_file_clone[0])?;
-                for path in paths {
-                    let entry = path?;
-                    let mut f = File::open(entry.file_name())?;
-                    let mut temp_content = String::new();
-                    f.read_to_string(&mut temp_content)?;
-                    contents.push_str(&temp_content);
-                }
-                fs::write("concat_dir_file.txt", contents)?;
-            } else {
-                for file in some_file {
-                    let mut f = File::open(file)?;
-                    let mut temp_content = String::new();
-                    f.read_to_string(&mut temp_content)?;
-                    contents.push_str(&temp_content);
-                }
-                fs::write("concat_file.txt", contents)?;
-            }
+    if is_directory {
+        let some_file_clone = files.clone();
+        let paths = fs::read_dir(&some_file_clone[0])?;
+        for path in paths {
+            let entry = path?;
+            let mut f = File::open(entry.file_name())?;
+            let mut temp_content = String::new();
+            f.read_to_string(&mut temp_content)?;
+            contents.push_str(&temp_content);
         }
-        None => println!("No files are available"),
+        fs::write("concat_dir_file.txt", contents)?;
+    } else {
+        for file in files {
+            let mut f = File::open(file)?;
+            let mut temp_content = String::new();
+            f.read_to_string(&mut temp_content)?;
+            contents.push_str(&temp_content);
+        }
+        fs::write("concat_file.txt", contents)?;
     }
+
     Ok(())
 }
 
@@ -146,42 +187,37 @@ fn find_file_function(dir_name: &String, file_name: &str) -> Result<()> {
     Ok(())
 }
 
-fn grep_function(pattern: &str, files: &Option<Vec<String>>) -> Result<()> {
+fn grep_function(pattern: &str, files: &Vec<String>) -> Result<()> {
     let pool = ThreadPool::new(4);
     let (tx, rx) = mpsc::channel::<String>();
     let re = Regex::new(pattern).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
-    match files {
-        Some(file_vector) => {
-            for file in file_vector {
-                let tx = tx.clone();
-                let re = re.clone();
-                let file = file.clone();
-                pool.execute(move || {
-                    let f = match File::open(&file) {
-                        Ok(f) => f,
-                        Err(_) => {
-                            eprintln!("File could not be opened...");
-                            return;
-                        }
-                    };
-                    let reader = io::BufReader::new(f);
-                    for (index, line) in reader.lines().enumerate() {
-                        let line = match line {
-                            Ok(l) => l,
-                            Err(_) => continue,
-                        };
-                        if re.is_match(&line) {
-                            tx.send(format!("Line - {}: {}", index + 1, line)).unwrap();
-                        }
-                    }
-                });
+    for file in files {
+        let tx = tx.clone();
+        let re = re.clone();
+        let file = file.clone();
+        pool.execute(move || {
+            let f = match File::open(&file) {
+                Ok(f) => f,
+                Err(_) => {
+                    eprintln!("File could not be opened...");
+                    return;
+                }
+            };
+            let reader = io::BufReader::new(f);
+            for (index, line) in reader.lines().enumerate() {
+                let line = match line {
+                    Ok(l) => l,
+                    Err(_) => continue,
+                };
+                if re.is_match(&line) {
+                    tx.send(format!("Line - {}: {}", index + 1, line)).unwrap();
+                }
             }
-            drop(tx);
-            for msg in rx {
-                println!("{}", msg);
-            }
-        }
-        None => println!("Error: Files not provided/found"),
+        });
+    }
+    drop(tx);
+    for msg in rx {
+        println!("{}", msg);
     }
 
     Ok(())

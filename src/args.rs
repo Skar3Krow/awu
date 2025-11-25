@@ -1,14 +1,5 @@
-use clap::{Args, Parser, Subcommand};
-
-#[derive(Debug, Parser)]
-#[command(author, version)]
-pub struct CliTool {
-    #[clap(subcommand)]
-    pub entity_type: EntityType,
-}
-
-#[derive(Debug, Subcommand)]
-pub enum EntityType {
+#[derive(Debug)]
+pub enum Command {
     /// Repeats User Input
     Echo(Repeat),
     /// Lists all the files and directories
@@ -21,59 +12,162 @@ pub enum EntityType {
     Grep(GrepArgs),
     /// Creates a directory and files
     Create(CreateArgs),
+    /// Exit
+    Exit(),
+    /// Un-written Command
+    Unknown(String),
 }
 
-#[derive(Debug, Args)]
+#[derive(Debug)]
 pub struct Repeat {
     /// The sentence to be repeated
-    #[arg(default_value = "*cold silence of the universe*")]
-    pub repeated_vector: Option<Vec<String>>,
+    pub repeated_vector: Vec<String>,
 }
 
-#[derive(Debug, Args)]
+#[derive(Debug)]
 pub struct ListArgs {
     /// Lists the directory
-    #[arg(default_value = ".")]
     pub directory: String,
     /// Lists all the hidden files as
-    #[arg(long, short)]
     pub all: bool,
     /// Lists in a long listing format
-    #[arg(long, short)]
     pub long: bool,
 }
 
-#[derive(Debug, Args)]
+#[derive(Debug)]
 pub struct CatArgs {
     /// Concatenates a directory
-    #[arg(long, short)]
     pub dir: bool,
     /// Takes n number of files as input
-    pub files: Option<Vec<String>>,
+    pub files: Vec<String>,
 }
 
-#[derive(Debug, Args)]
+#[derive(Debug)]
 pub struct FindArgs {
     /// Area where the file needs to be searched
-    #[arg(default_value = ".")]
     pub dir_name: String,
     /// File to be searched
     pub file_name: String,
 }
 
-#[derive(Debug, Parser)]
+#[derive(Debug)]
 pub struct GrepArgs {
     /// Text to be matched
     pub match_text: String,
     /// File in which you want to match text
-    pub file_name: Option<Vec<String>>,
+    pub file_name: Vec<String>,
 }
 
-#[derive(Debug, Args)]
+#[derive(Debug)]
 pub struct CreateArgs {
     /// Create a directory
-    #[arg(short, long)]
     pub directory: bool,
     /// File Name
     pub file_name: String,
+}
+
+/*
+#[derive(Debug)]
+pub struct Exit {
+    exit_status: bool,
+}
+*/
+
+pub fn parse_command(input: &str) -> Command {
+    let mut parts = input
+        .split_whitespace()
+        .map(String::from)
+        .collect::<Vec<_>>();
+
+    if parts.is_empty() {
+        return Command::Unknown("empty".into());
+    }
+
+    let cmd = parts.remove(0);
+
+    match cmd.as_str() {
+        "echo" => Command::Echo(Repeat {
+            repeated_vector: parts,
+        }),
+
+        "list" => {
+            let mut all = false;
+            let mut long = false;
+            let mut directory = ".".into();
+
+            for p in &parts {
+                match p.as_str() {
+                    "-a" | "--all" => all = true,
+                    "-l" | "--long" => long = true,
+                    _ => directory = p.clone(),
+                }
+            }
+
+            Command::List(ListArgs {
+                directory,
+                all,
+                long,
+            })
+        }
+
+        "cat" => {
+            let mut dir = false;
+            let mut files: Vec<String> = Vec::new();
+
+            for p in parts {
+                match p.as_str() {
+                    "-d" | "--dir" => dir = true,
+                    _ => files.push(p),
+                }
+            }
+
+            Command::Cat(CatArgs { dir, files })
+        }
+
+        "find" => {
+            if parts.len() < 2 {
+                return Command::Unknown("find needs 2 args".into());
+            }
+
+            Command::Find(FindArgs {
+                dir_name: parts[0].clone(),
+                file_name: parts[1].clone(),
+            })
+        }
+
+        "grep" => {
+            if parts.is_empty() {
+                return Command::Unknown("grep needs 1+ args".into());
+            }
+
+            let match_text = parts.remove(0);
+            let file_name = parts;
+
+            Command::Grep(GrepArgs {
+                match_text,
+                file_name,
+            })
+        }
+
+        "create" => {
+            let mut directory = false;
+            let mut file_name = "".to_string();
+
+            for p in parts {
+                match p.as_str() {
+                    "-d" | "--directory" => directory = true,
+                    _ => file_name = p,
+                }
+            }
+
+            Command::Create(CreateArgs {
+                directory,
+                file_name,
+            })
+        }
+
+        "exit" => Command::Exit(),
+
+        other => Command::Unknown(other.into()),
+    }
 }
