@@ -1,5 +1,7 @@
 //Local Imports
 mod args;
+mod lexer;
+mod tokens;
 
 //Function Imports
 use crate::args::{parse_command, Command};
@@ -233,4 +235,23 @@ fn create_function(is_directory: bool, file_name: String) -> Result<()> {
         println!("File {} has been created", file_name.green());
     }
     Ok(())
+}
+
+// Tests
+#[cfg(test)]
+mod tests {
+    use crate::lexer::Lexer;
+    use crate::tokens::Token;
+
+    #[test]
+    fn lexer_parsing_test_1() {
+        let mut lexer = Lexer::new(r#"grep "hello world" < in.txt | sort > out.txt &"#);
+        loop {
+            let tok = lexer.next_token();
+            println!("{:?}", tok);
+            if tok == Token::EOF {
+                break;
+            }
+        }
+    }
 }
