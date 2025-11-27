@@ -1,6 +1,7 @@
 //Local Imports
 mod args;
 mod lexer;
+mod parser;
 mod tokens;
 
 //Function Imports
