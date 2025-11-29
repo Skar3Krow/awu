@@ -6,6 +6,7 @@ mod tokens;
 
 //Function Imports
 use crate::args::{parse_command, Command};
+use crate::parser::Parser;
 use colored::*;
 use regex::Regex;
 use std::fs::{self, create_dir, DirEntry, File};
@@ -65,47 +66,6 @@ fn main() {
             }
         }
     }
-    /*
-    let matches = CliTool::parse();
-    match matches.entity_type {
-        EntityType::Echo(some_string) => match echo_function(&some_string.repeated_vector) {
-            Ok(_) => (),
-            Err(e) => eprintln!("Error: {}", e),
-        },
-        EntityType::List(some_argument) => match list_function(
-            &some_argument.directory,
-            some_argument.all,
-            some_argument.long,
-        ) {
-            Ok(_) => (),
-            Err(e) => eprintln!("Error : {:?}", e),
-        },
-        EntityType::Cat(cat_argument) => {
-            match concatenate_function(cat_argument.dir, &cat_argument.files) {
-                Ok(_) => (),
-                Err(e) => eprintln!("Error: {:?}", e),
-            }
-        }
-        EntityType::Find(find_argument) => {
-            match find_file_function(&find_argument.dir_name, &find_argument.file_name) {
-                Ok(_) => (),
-                Err(e) => eprintln!("Error : {}", e),
-            }
-        }
-        EntityType::Grep(grep_argument) => {
-            match grep_function(&grep_argument.match_text, &grep_argument.file_name) {
-                Ok(_) => (),
-                Err(e) => eprintln!("Error: {:?}", e),
-            }
-        }
-        EntityType::Create(create_argument) => {
-            match create_function(create_argument.directory, create_argument.file_name) {
-                Ok(()) => (),
-                Err(e) => eprintln!("Error: {:?}", e),
-            }
-        }
-    };
-    */
 }
 
 fn echo_function(some_vector: &Vec<String>) -> Result<()> {
@@ -243,9 +203,10 @@ fn create_function(is_directory: bool, file_name: String) -> Result<()> {
 mod tests {
     use crate::lexer::Lexer;
     use crate::tokens::Token;
+    use crate::Parser;
 
     #[test]
-    fn lexer_parsing_test_1() {
+    fn lexer_test_1() {
         let mut lexer = Lexer::new(r#"grep "hello world" < in.txt | sort > out.txt &"#);
         loop {
             let tok = lexer.next_token();
@@ -254,5 +215,12 @@ mod tests {
                 break;
             }
         }
+    }
+
+    #[test]
+    fn parser_test_1() {
+        let mut parser = Parser::new(r#"grep "hi" < in.txt | sort | uniq -c > out.txt &"#);
+        let ast = parser.parse();
+        println!("{:#?}", ast);
     }
 }
